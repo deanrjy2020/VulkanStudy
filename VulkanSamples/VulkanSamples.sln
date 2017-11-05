@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VulkanSamples", "VulkanSamples\VulkanSamples.vcxproj", "{25DC1AE2-A30B-472C-974E-F11836267873}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "01HelloTriangleApplication", "HelloTriangleApplication\HelloTriangleApplication.vcxproj", "{54CFD586-F026-4554-A3EA-13B9E257A986}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{25DC1AE2-A30B-472C-974E-F11836267873}.Release|x64.Build.0 = Release|x64
 		{25DC1AE2-A30B-472C-974E-F11836267873}.Release|x86.ActiveCfg = Release|Win32
 		{25DC1AE2-A30B-472C-974E-F11836267873}.Release|x86.Build.0 = Release|Win32
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Debug|x64.ActiveCfg = Debug|x64
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Debug|x64.Build.0 = Debug|x64
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Debug|x86.ActiveCfg = Debug|Win32
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Debug|x86.Build.0 = Debug|Win32
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Release|x64.ActiveCfg = Release|x64
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Release|x64.Build.0 = Release|x64
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Release|x86.ActiveCfg = Release|Win32
+		{54CFD586-F026-4554-A3EA-13B9E257A986}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
