@@ -11,6 +11,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <fstream>
 
 const int WIDTH = 640;
 const int HEIGHT = 480;
@@ -95,6 +96,28 @@ void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT
 	}
 }
 
+static std::vector<char> readFile(const std::string& filename) {
+	// ate: Start reading at the end of the file
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+	if (!file.is_open()) {
+		throw std::runtime_error("failed to open file!");
+	}
+
+	// we can use the read position to determine the size of the file and allocate a buffer
+	// as reading at the end of the file
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+	
+	// seek back to the beginning of the file and read all of the bytes at once
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	file.close();
+
+	std::cout << filename.c_str() << ", size: " << fileSize << std::endl;
+	return buffer;
+}
+
 // It's actually possible that the queue families supporting drawing commands and the ones supporting presentation do not overlap.
 struct QueueFamilyIndices {
 	int graphicsFamilyIdx = -1;
@@ -174,7 +197,184 @@ private:
 	}
 
 	void createGraphicsPipeline() {
+		// setup shaders.
+		auto vertShaderCode = readFile("shaders/vert.spv");
+		auto fragShaderCode = readFile("shaders/frag.spv");
 
+		VkShaderModule vertShaderModule;
+		VkShaderModule fragShaderModule;
+
+		vertShaderModule = createShaderModule(vertShaderCode);
+		fragShaderModule = createShaderModule(fragShaderCode);
+
+		VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vertShaderStageInfo.module = vertShaderModule;
+		// That means that it's possible to combine multiple fragment shaders into 
+		// a single shader module and use different entry points to differentiate 
+		// between their behaviors. Here use the main.
+		vertShaderStageInfo.pName = "main";
+		// It allows you to specify values for shader constants. 
+		// You can use a single shader module where its behavior can be configured 
+		// at pipeline creation by specifying different values for the constants used in it. 
+		// This is more efficient than configuring the shader using variables at render time, 
+		// because the compiler can do optimizations like eliminating if statements that 
+		// depend on these values.
+		vertShaderStageInfo.pSpecializationInfo = nullptr;
+
+		VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+		fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		fragShaderStageInfo.module = fragShaderModule;
+		fragShaderStageInfo.pName = "main";
+
+		VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+		// Vertex input
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputInfo.vertexBindingDescriptionCount = 0;
+		vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
+		vertexInputInfo.vertexAttributeDescriptionCount = 0;
+		vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
+
+		// Input assembly
+		// 1, what kind of geometry will be drawn from the vertices and 
+		//		VK_PRIMITIVE_TOPOLOGY_POINT_LIST: points from vertices
+		//		VK_PRIMITIVE_TOPOLOGY_LINE_LIST: line from every 2 vertices without reuse
+		//		VK_PRIMITIVE_TOPOLOGY_LINE_STRIP : the end vertex of every line is used as start vertex for the next line
+		//		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : triangle from every 3 vertices without reuse
+		//		VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP : the second and third vertex of every triangle are 
+		//												used as first two vertices of the next triangle
+		// 2, if primitive restart should be enabled
+		// Normally, the vertices are loaded from the vertex buffer by index in sequential order, 
+		// but with an element buffer you can specify the indices to use yourself.
+		// If you set the primitiveRestartEnable member to VK_TRUE, then it's possible to break up 
+		// lines and triangles in the _STRIP topology modes by using a special index of 0xFFFF or 0xFFFFFFFF.
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+		// Viewports and scissors
+		VkViewport viewport = {};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)swapChainExtent.width;
+		viewport.height = (float)swapChainExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		VkRect2D scissor = {};
+		scissor.offset = { 0, 0 };
+		scissor.extent = swapChainExtent;
+
+		VkPipelineViewportStateCreateInfo viewportState = {};
+		viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &viewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &scissor;
+
+		// Rasterizer
+		VkPipelineRasterizationStateCreateInfo rasterizer = {};
+		rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		// If depthClampEnable is set to VK_TRUE, then fragments that are beyond the near 
+		// and far planes are clamped to them as opposed to discarding them. 
+		// This is useful in some special cases like shadow maps.
+		rasterizer.depthClampEnable = VK_FALSE;
+		// If rasterizerDiscardEnable is set to VK_TRUE, then geometry never passes through 
+		// the rasterizer stage. This basically disables any output to the framebuffer.
+		rasterizer.rasterizerDiscardEnable = VK_FALSE;
+		// The polygonMode determines how fragments are generated for geometry.
+		//		VK_POLYGON_MODE_FILL: fill the area of the polygon with fragments
+		//		VK_POLYGON_MODE_LINE: polygon edges are drawn as lines
+		//		VK_POLYGON_MODE_POINT : polygon vertices are drawn as points
+		// Using any mode other than fill requires enabling a GPU feature.
+		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+		// any line thicker than 1.0f requires you to enable the wideLines GPU feature.
+		rasterizer.lineWidth = 1.0f;
+		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+		rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		// This is sometimes used for shadow mapping
+		rasterizer.depthBiasEnable = VK_FALSE;
+		rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+		rasterizer.depthBiasClamp = 0.0f; // Optional
+		rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+
+		// Multisampling
+		VkPipelineMultisampleStateCreateInfo multisampling = {};
+		multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisampling.sampleShadingEnable = VK_FALSE;
+		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisampling.minSampleShading = 1.0f; // Optional
+		multisampling.pSampleMask = nullptr; // Optional
+		multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+		multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
+		// Depth and stencil testing
+		// skip
+
+		// Color blending, two ways
+		//		1, Mix the old and new value to produce a final color
+		//		2, Combine the old and new value using a bitwise operation
+		// 1,
+		VkPipelineColorBlendAttachmentState colorBlendAttachment = {}; // configuration per attached framebuffer
+		colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		colorBlendAttachment.blendEnable = VK_FALSE;
+		colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+		colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+		// pseudocode:
+		// if (blendEnable) {
+		//		finalColor.rgb = (srcColorBlendFactor * newColor.rgb) <colorBlendOp> (dstColorBlendFactor * oldColor.rgb);
+		//		finalColor.a = (srcAlphaBlendFactor * newColor.a) <alphaBlendOp> (dstAlphaBlendFactor * oldColor.a);
+		// } else {
+		//		finalColor = newColor;
+		// }
+		//
+		// finalColor = finalColor & colorWriteMask;
+		// 
+		// most common way:
+		// finalColor.rgb = newAlpha * newColor + (1 - newAlpha) * oldColor;
+		// finalColor.a = newAlpha.a;
+		// code:
+		// colorBlendAttachment.blendEnable = VK_TRUE;
+		// colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		// colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		// colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+		// colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		// colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		// colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+		// 2, 另一种方法效果一样, 用
+		// VkPipelineColorBlendStateCreateInfo
+
+		// Dynamic state
+		// dean next
+
+
+
+		vkDestroyShaderModule(device, fragShaderModule, nullptr);
+		vkDestroyShaderModule(device, vertShaderModule, nullptr);
+	}
+
+	VkShaderModule createShaderModule(const std::vector<char>& code) {
+		VkShaderModuleCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		createInfo.codeSize = code.size();
+		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+		VkShaderModule shaderModule;
+		if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create shader module!");
+		}
+
+		return shaderModule;
 	}
 
 	void createImageViews() {
