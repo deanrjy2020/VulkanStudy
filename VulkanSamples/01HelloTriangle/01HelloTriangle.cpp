@@ -141,7 +141,7 @@ struct SwapChainSupportDetails {
 	}
 };
 
-class HelloTriangleApplication {
+class HelloTriangle {
 public:
 	void run() {
 		initWindow();
@@ -1017,7 +1017,7 @@ private:
 };
 
 int main() {
-	HelloTriangleApplication app;
+	HelloTriangle app;
 
 	try {
 		app.run();

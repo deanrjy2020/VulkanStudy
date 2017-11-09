@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{54CFD586-F026-4554-A3EA-13B9E257A986}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>HelloTriangleApplication</RootNamespace>
+    <RootNamespace>01HelloTriangle</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
     <ProjectName>01HelloTriangle</ProjectName>
   </PropertyGroup>
