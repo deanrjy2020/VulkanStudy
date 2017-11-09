@@ -145,6 +145,12 @@ private:
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 	SwapChainSupportDetails details; //prefer to do once.
+	VkSwapchainKHR swapChain;
+	std::vector<VkImage> swapChainImages; // refer to the images in the swapChain, no need to cleanup.
+	VkFormat swapChainImageFormat;
+	VkExtent2D swapChainExtent;
+
+	std::vector<VkImageView> swapChainImageViews;
 
 	void initWindow() {
 		glfwInit();
@@ -160,7 +166,49 @@ private:
 		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
+
 		createSwapChain();
+		createImageViews();
+
+		createGraphicsPipeline();
+	}
+
+	void createGraphicsPipeline() {
+
+	}
+
+	void createImageViews() {
+		// An image view is sufficient to start using an image as a texture, 
+		// but it's not quite ready to be used as a render target just yet (need FB).
+		swapChainImageViews.resize(swapChainImages.size());
+
+		for (size_t i = 0; i < swapChainImages.size(); i++) {
+			VkImageViewCreateInfo createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			createInfo.image = swapChainImages[i];
+			// The viewType parameter allows you to treat images as 1D textures, 
+			// 2D textures, 3D textures and cube maps.
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.format = swapChainImageFormat;
+			// you can map all of the channels to the red channel for a monochrome 
+			// texture. You can also map constant values of 0 and 1 to a channel. 
+			// here we'll stick to the default mapping.
+			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			// used as color targets
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = 1;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+
+			if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+				throw std::runtime_error("failed to create image views!");
+			}
+		}
+
 	}
 
 	void createSwapChain() {
@@ -170,7 +218,70 @@ private:
 		VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
 		VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
-		//dean next: There is actually one more small things that need to be decided upon
+		// save them for future use.
+		this->swapChainImageFormat = surfaceFormat.format;
+		this->swapChainExtent = extent;
+
+		// choose image number in the swap chain
+		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+		if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+			imageCount = swapChainSupport.capabilities.maxImageCount;
+		}
+		printf("swap chain image queue count = %d\n", imageCount);
+
+		VkSwapchainCreateInfoKHR createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		createInfo.surface = surface;
+		createInfo.minImageCount = imageCount;
+		createInfo.imageFormat = surfaceFormat.format;
+		createInfo.imageColorSpace = surfaceFormat.colorSpace;
+		createInfo.imageExtent = extent;
+		createInfo.imageArrayLayers = 1; // This is always 1 unless you are developing a stereoscopic 3D application.
+		// specifies what kind of operations we'll use the images in the swap chain for.
+		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; 
+
+		// we need to specify how to handle swap chain images that will be used across 
+		// multiple queue families. That will be the case in our application if the 
+		// graphics queue family is different from the presentation queue. 
+		// We'll be drawing on the images in the swap chain from the graphics queue 
+		// and then submitting them on the presentation queue.
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+		uint32_t queueFamilyIndices[] = { (uint32_t)indices.graphicsFamilyIdx, (uint32_t)indices.presentFamilyIdx };
+		if (indices.graphicsFamilyIdx != indices.presentFamilyIdx) {
+			// Images can be used across multiple queue families without explicit ownership transfers.
+			createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			createInfo.queueFamilyIndexCount = 2;
+			createInfo.pQueueFamilyIndices = queueFamilyIndices;
+		} else {
+			// An image is owned by one queue family at a time and ownership must be 
+			// explicitly transfered before using it in another queue family. 
+			// This option offers the best performance.
+			createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			createInfo.queueFamilyIndexCount = 0; // Optional
+			createInfo.pQueueFamilyIndices = nullptr; // Optional
+		}
+		// We can specify that a certain transform should be applied to images in the 
+		// swap chain if it is supported (supportedTransforms in capabilities), 
+		// like a 90 degree clockwise rotation or horizontal flip. 
+		// To specify that you do not want any transformation, 
+		// simply specify the current transformation.
+		createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+		// The compositeAlpha field specifies if the alpha channel should be used for 
+		// blending with other windows in the window system. 
+		// You'll almost always want to simply ignore the alpha channel
+		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		createInfo.presentMode = presentMode;
+		createInfo.clipped = VK_TRUE;
+		createInfo.oldSwapchain = VK_NULL_HANDLE;
+		
+		if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create swap chain!");
+		}
+
+		// retrieving the image in the swap chain
+		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+		swapChainImages.resize(imageCount);
+		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
 	}
 
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
@@ -550,6 +661,10 @@ private:
 	}
 
 	void cleanup() {
+		for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+			vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+		}
+		vkDestroySwapchainKHR(device, swapChain, nullptr);
 		vkDestroyDevice(device, nullptr);
 		DestroyDebugReportCallbackEXT(instance1, callback, nullptr);
 		vkDestroySurfaceKHR(instance1, surface, nullptr);
