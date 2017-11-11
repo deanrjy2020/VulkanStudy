@@ -147,6 +147,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="01HelloTriangle.cpp" />
+    <ClCompile Include="01HelloTriangleExt.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="01HelloTriangle.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
