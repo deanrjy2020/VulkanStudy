@@ -144,7 +144,6 @@ private:
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 
-	bool swapChainChanged = false;
 	SwapChainSupportDetails details; //prefer to do once.
 	VkSwapchainKHR swapChain;
 	std::vector<VkImage> swapChainImages; // refer to the images in the swapChain, no need to cleanup.
@@ -172,12 +171,9 @@ private:
 		glfwInit();
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
-
-		glfwSetWindowUserPointer(window, this);
-		glfwSetWindowSizeCallback(window, HelloTriangle::onWindowResized);
 	}
 
 	void initVulkan() {
@@ -210,17 +206,14 @@ private:
 		vkDeviceWaitIdle(device);
 	}
 
-	// the disadvantage of this approach is that we need to stop all rendering before creating the new swap chain. 
-	// It is possible to create a new swap chain while drawing commands on an image from the old swap chain are still in-flight. 
-	// You need to pass the previous swap chain to the oldSwapChain field in the VkSwapchainCreateInfoKHR struct and 
-	// destroy the old swap chain as soon as you've finished using it.
-	void cleanupSwapChain() {
+	void cleanup() {
+		vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+		vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+		vkDestroyCommandPool(device, commandPool, nullptr);
+
 		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
 			vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
 		}
-
-		// free the cmd buffer, reuse the pool.
-		vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
 		vkDestroyPipeline(device, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -231,15 +224,6 @@ private:
 		}
 
 		vkDestroySwapchainKHR(device, swapChain, nullptr);
-	}
-
-	void cleanup() {
-		cleanupSwapChain();
-
-		vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-		vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-		
-		vkDestroyCommandPool(device, commandPool, nullptr);
 		vkDestroyDevice(device, nullptr);
 		DestroyDebugReportCallbackEXT(instance1, callback, nullptr);
 		vkDestroySurfaceKHR(instance1, surface, nullptr);
@@ -249,37 +233,6 @@ private:
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
-	}
-
-	static void onWindowResized(GLFWwindow* window, int width, int height) {
-		if (width == 0 || height == 0) return;
-
-		HelloTriangle *app = reinterpret_cast<HelloTriangle*>(glfwGetWindowUserPointer(window));
-		app->recreateSwapChain();
-	}
-
-	void recreateSwapChain() {
-		// we shouldn't touch resources that may still be in use.
-		vkDeviceWaitIdle(device);
-
-		this->swapChainChanged = true;
-
-		cleanupSwapChain();
-		createSwapChain();
-		
-		// The image views need to be recreated because they are based directly on the swap chain images.
-		createImageViews();
-		// The render pass needs to be recreated because it depends on the format of the swap chain images. 
-		// It is rare for the swap chain image format to change during an operation like a window resize, 
-		// but it should still be handled.
-		createRenderPass();
-		// Viewport and scissor rectangle size is specified during graphics pipeline creation, so the pipeline also needs to be rebuilt.
-		createGraphicsPipeline();
-		// the framebuffers and command buffers also directly depend on the swap chain images.
-		createFramebuffers();
-		createCommandBuffers();
-
-		this->swapChainChanged = false;
 	}
 
 	void createInstance() {
@@ -452,6 +405,10 @@ private:
 		VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
 		VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
+		// save them for future use.
+		this->swapChainImageFormat = surfaceFormat.format;
+		this->swapChainExtent = extent;
+
 		// choose image number in the swap chain
 		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 		if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -512,9 +469,6 @@ private:
 		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
 		swapChainImages.resize(imageCount);
 		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
-		// save them for future use.
-		this->swapChainImageFormat = surfaceFormat.format;
-		this->swapChainExtent = extent;
 	}
 
 	void createImageViews() {
@@ -565,8 +519,6 @@ private:
 		//		VK_ATTACHMENT_STORE_OP_DONT_CARE: Contents of the framebuffer will be undefined after the rendering operation.
 		// apply to color and depth data, stencilLoadOp / stencilStoreOp apply to stencil data.
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		// specifies which layout the image will have before the render pass begins.
 		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		// specifies the layout to automatically transition to when the render pass finishes.
@@ -618,8 +570,11 @@ private:
 		auto vertShaderCode = readFile("shaders/vert.spv");
 		auto fragShaderCode = readFile("shaders/frag.spv");
 
-		VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-		VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+		VkShaderModule vertShaderModule;
+		VkShaderModule fragShaderModule;
+
+		vertShaderModule = createShaderModule(vertShaderCode);
+		fragShaderModule = createShaderModule(fragShaderCode);
 
 		VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -962,19 +917,19 @@ private:
 	// Fences are mainly designed to synchronize your application itself with rendering operation, 
 	// whereas semaphores are used to synchronize operations within or across command queues. 
 	void drawFrame() {
+
+		updateAppState();
+
+		// waiting for presentation to finish before starting to draw the next frame,
+		// otherwise, mem leak?
+		vkQueueWaitIdle(presentQueue);
+
 		// Acquire an image from the swap chain
 		uint32_t imageIndex;
 		// the swap chain from which we wish to acquire an image
 		// specifies a timeout in nanoseconds for an image to become available. 
-		VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(),
+		vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(),
 			imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-		// VK_ERROR_OUT_OF_DATE_KHR: The swap chain has become incompatible with the surface and can no longer be used for rendering.
-		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-			recreateSwapChain();
-			return;
-		} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-			throw std::runtime_error("failed to acquire swap chain image!");
-		}
 
 		// Execute the command buffer with that image as attachment in the framebuffer
 		// Submitting the command buffer
@@ -1018,21 +973,7 @@ private:
 		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pResults = nullptr; // Optional
 
-		result = vkQueuePresentKHR(presentQueue, &presentInfo);
-		// VK_SUBOPTIMAL_KHR: The swap chain can still be used to successfully present to the surface, 
-		// but the surface properties are no longer matched exactly. 
-		// For example, the platform may be simply resizing the image to fit the window now.
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-			recreateSwapChain();
-		} else if (result != VK_SUCCESS) {
-			throw std::runtime_error("failed to present swap chain image!");
-		}
-
-		updateAppState();
-
-		// waiting for presentation to finish before starting to draw the next frame,
-		// otherwise, mem leak?
-		vkQueueWaitIdle(presentQueue);
+		vkQueuePresentKHR(presentQueue, &presentInfo);
 	}
 
 	VkShaderModule createShaderModule(const std::vector<char>& code) {
@@ -1082,13 +1023,7 @@ private:
 			return capabilities.currentExtent;
 		} else {
 			// probably will not use this else
-			int width, height;
-			glfwGetWindowSize(window, &width, &height);
-
-            VkExtent2D actualExtent = {
-                static_cast<uint32_t>(width),
-                static_cast<uint32_t>(height)
-            };
+			VkExtent2D actualExtent = { WIDTH, HEIGHT };
 
 			actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
 			actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
@@ -1098,7 +1033,7 @@ private:
 	}
 
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
-		if (!this->swapChainChanged && this->details.isComplete()) {
+		if (this->details.isComplete()) {
 			return this->details;
 		}
 
@@ -1314,7 +1249,7 @@ private:
 		file.seekg(0);
 		file.read(buffer.data(), fileSize);
 		file.close();
-		
+
 		std::cout << filename.c_str() << ", size: " << fileSize << std::endl;
 		return buffer;
 	}
