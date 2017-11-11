@@ -201,6 +201,9 @@ private:
 			glfwPollEvents();
 			drawFrame();
 		}
+
+		// wait for the logical device to finish operations before exiting mainLoop and destroying the window.
+		vkDeviceWaitIdle(device);
 	}
 
 	void cleanup() {
@@ -906,11 +909,21 @@ private:
 			throw std::runtime_error("failed to create semaphores!");
 		}
 	}
-
+	void updateAppState() {
+		// do sth in CPU while the previous frame is being rendered. 
+		// That way you keep both the GPU and CPU busy at all times.
+	}
 	// There are two ways of synchronizing swap chain events: fences and semaphores.
 	// Fences are mainly designed to synchronize your application itself with rendering operation, 
 	// whereas semaphores are used to synchronize operations within or across command queues. 
 	void drawFrame() {
+
+		updateAppState();
+
+		// waiting for presentation to finish before starting to draw the next frame,
+		// otherwise, mem leak?
+		vkQueueWaitIdle(presentQueue);
+
 		// Acquire an image from the swap chain
 		uint32_t imageIndex;
 		// the swap chain from which we wish to acquire an image
