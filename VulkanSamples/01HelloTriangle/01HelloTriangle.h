@@ -104,7 +104,8 @@ class HelloTriangle {
 public:
 	void run();
 
-private:
+	// to be used in the son.
+protected:
 	GLFWwindow* window;
 	VkInstance instance1;
 	VkInstance instance2; // not use this one
@@ -149,13 +150,14 @@ private:
 	void initVulkan();
 	void mainLoop();
 
+	void cleanupSwapChain();
 	void cleanup();
 	void createInstance();
 	void setupDebugCallback();
 	void createSurface();
 	void pickPhysicalDevice();
 	void createLogicalDevice();
-	void createSwapChain();
+	void createSwapChain(bool redoQuery = false);
 	void createImageViews();
 	void createRenderPass();
 	void createGraphicsPipeline();
@@ -169,7 +171,7 @@ private:
 	VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
 	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, bool redoQuery = false);
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);

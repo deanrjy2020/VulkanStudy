@@ -70,14 +70,17 @@ void HelloTriangle::mainLoop() {
 	vkDeviceWaitIdle(device);
 }
 
-void HelloTriangle::cleanup() {
-	vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-	vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-	vkDestroyCommandPool(device, commandPool, nullptr);
-
+// the disadvantage of this approach is that we need to stop all rendering before creating the new swap chain. 
+// It is possible to create a new swap chain while drawing commands on an image from the old swap chain are still in-flight. 
+// You need to pass the previous swap chain to the oldSwapChain field in the VkSwapchainCreateInfoKHR struct and
+// destroy the old swap chain as soon as you've finished using it.
+void HelloTriangle::cleanupSwapChain() {
 	for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
 		vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
 	}
+
+	// free the cmd buffer, reuse the pool.
+	vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
 	vkDestroyPipeline(device, graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -88,6 +91,13 @@ void HelloTriangle::cleanup() {
 	}
 
 	vkDestroySwapchainKHR(device, swapChain, nullptr);
+}
+
+void HelloTriangle::cleanup() {
+	cleanupSwapChain();
+	vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+	vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+	vkDestroyCommandPool(device, commandPool, nullptr);
 	vkDestroyDevice(device, nullptr);
 	DestroyDebugReportCallbackEXT(instance1, callback, nullptr);
 	vkDestroySurfaceKHR(instance1, surface, nullptr);
@@ -262,8 +272,8 @@ void HelloTriangle::createLogicalDevice() {
 	vkGetDeviceQueue(device, indices.presentFamilyIdx, 0, &presentQueue);
 }
 
-void HelloTriangle::createSwapChain() {
-	SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+void HelloTriangle::createSwapChain(bool redoQuery) {
+	SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, redoQuery);
 
 	VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
@@ -894,8 +904,8 @@ VkExtent2D HelloTriangle::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capab
 	}
 }
 
-SwapChainSupportDetails HelloTriangle::querySwapChainSupport(VkPhysicalDevice device) {
-	if (this->details.isComplete()) {
+SwapChainSupportDetails HelloTriangle::querySwapChainSupport(VkPhysicalDevice device, bool redoQuery) {
+	if (!redoQuery && this->details.isComplete()) {
 		return this->details;
 	}
 
@@ -1221,15 +1231,15 @@ void HelloTriangle::printAllFeatures(const VkPhysicalDeviceFeatures& features) {
 }
 
 
-int main() {
-	HelloTriangle app;
-
-	try {
-		app.run();
-	} catch (const std::runtime_error& e) {
-		std::cerr << e.what() << std::endl;
-		//printf(e.what());
-		return EXIT_FAILURE;
-	}
-	return EXIT_SUCCESS;
-}
+//int main() {
+//	HelloTriangle app;
+//
+//	try {
+//		app.run();
+//	} catch (const std::runtime_error& e) {
+//		std::cerr << e.what() << std::endl;
+//		//printf(e.what());
+//		return EXIT_FAILURE;
+//	}
+//	return EXIT_SUCCESS;
+//}
