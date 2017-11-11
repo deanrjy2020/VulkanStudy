@@ -405,10 +405,6 @@ private:
 		VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
 		VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
-		// save them for future use.
-		this->swapChainImageFormat = surfaceFormat.format;
-		this->swapChainExtent = extent;
-
 		// choose image number in the swap chain
 		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 		if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
@@ -469,6 +465,9 @@ private:
 		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
 		swapChainImages.resize(imageCount);
 		vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+		// save them for future use.
+		this->swapChainImageFormat = surfaceFormat.format;
+		this->swapChainExtent = extent;
 	}
 
 	void createImageViews() {
@@ -519,6 +518,8 @@ private:
 		//		VK_ATTACHMENT_STORE_OP_DONT_CARE: Contents of the framebuffer will be undefined after the rendering operation.
 		// apply to color and depth data, stencilLoadOp / stencilStoreOp apply to stencil data.
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		// specifies which layout the image will have before the render pass begins.
 		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		// specifies the layout to automatically transition to when the render pass finishes.
@@ -570,11 +571,8 @@ private:
 		auto vertShaderCode = readFile("shaders/vert.spv");
 		auto fragShaderCode = readFile("shaders/frag.spv");
 
-		VkShaderModule vertShaderModule;
-		VkShaderModule fragShaderModule;
-
-		vertShaderModule = createShaderModule(vertShaderCode);
-		fragShaderModule = createShaderModule(fragShaderCode);
+		VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+		VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
 		VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 		vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1249,7 +1247,7 @@ private:
 		file.seekg(0);
 		file.read(buffer.data(), fileSize);
 		file.close();
-
+		
 		std::cout << filename.c_str() << ", size: " << fileSize << std::endl;
 		return buffer;
 	}
