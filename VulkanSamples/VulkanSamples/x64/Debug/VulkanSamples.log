@@ -1,0 +1,4 @@
+﻿  main.cpp
+LINK : warning LNK4098: defaultlib 'MSVCRT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  VulkanSamples.vcxproj -> D:\code\VulkanStudy\VulkanSamples\x64\Debug\VulkanSamples.exe
+  VulkanSamples.vcxproj -> D:\code\VulkanStudy\VulkanSamples\x64\Debug\VulkanSamples.pdb (Full PDB)
