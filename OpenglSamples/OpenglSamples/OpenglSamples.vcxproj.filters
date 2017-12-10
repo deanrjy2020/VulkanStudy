@@ -15,10 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="glfw_glew_example.cpp">
+    <ClCompile Include="01glfwExample.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="glfwExample.cpp">
+    <ClCompile Include="02glfw_glew_example.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="03extensions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -154,8 +154,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="glfwExample.cpp" />
-    <ClCompile Include="glfw_glew_example.cpp" />
+    <ClCompile Include="01glfwExample.cpp" />
+    <ClCompile Include="02glfw_glew_example.cpp" />
+    <ClCompile Include="03extensions.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

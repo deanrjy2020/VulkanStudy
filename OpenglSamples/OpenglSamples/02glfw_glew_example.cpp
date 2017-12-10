@@ -22,7 +22,7 @@ const GLchar* fragmentShaderSource = "#version 330 core\n"
 "color = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
 "}\n\0";
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-int main()
+int main2()
 {
 	// Init GLFW
 	glfwInit();
