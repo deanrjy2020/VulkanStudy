@@ -49,7 +49,7 @@ int isExtensionSupported(const char *extension)
     return 0;
 }
 
-void main(void)
+void main3(void)
 {
 	GLFWwindow* window;
 	glfwSetErrorCallback(error_callback);

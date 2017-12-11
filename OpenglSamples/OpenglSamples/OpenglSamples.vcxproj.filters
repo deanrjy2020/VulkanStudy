@@ -24,5 +24,8 @@
     <ClCompile Include="03extensions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="00nextTempFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
