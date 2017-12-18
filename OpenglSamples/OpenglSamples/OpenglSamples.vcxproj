@@ -154,10 +154,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="glfw_basic.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="shader_basic.cpp" />
-    <ClCompile Include="path_rendering_ext_basic.cpp" />
+    <ClCompile Include="tests\glfw_basic.cpp" />
+    <ClCompile Include="tests\path_rendering_ext_basic.cpp" />
+    <ClCompile Include="tests\shader_basic.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tests.h" />
