@@ -1,5 +1,3 @@
-//glMatrixMode 不能和glew一起用
-
 #include <GLFW/glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,7 +10,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
-int main1(void)
+int glfw_basic(void)
 {
     GLFWwindow* window;
     glfwSetErrorCallback(error_callback);
@@ -33,6 +31,7 @@ int main1(void)
         glfwGetFramebufferSize(window, &width, &height);
         ratio = width / (float)height;
         glViewport(0, 0, width, height);
+        glClearColor(0,0,0,0);
         glClear(GL_COLOR_BUFFER_BIT);
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
