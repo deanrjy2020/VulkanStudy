@@ -7,16 +7,19 @@
 #include<GLFW/glfw3.h>
 
 using namespace std;
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
+
+// Window dimensions
+static int width, height;
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-// Window dimensions
-static int width, height;
+//=====================================================================================
 static GLuint VBO, VAO;
 static GLuint shaderProgram;
+
 // Shaders
 static const GLchar * vertexShaderSource = "#version 330 core\n"
 "layout (location=0) in vec3 position;\n"

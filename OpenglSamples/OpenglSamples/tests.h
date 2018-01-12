@@ -4,3 +4,4 @@
 int glfw_basic();
 int shader_basic();
 int path_rendering_ext_basic();
+int geometry_shader();

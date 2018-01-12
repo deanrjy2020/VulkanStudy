@@ -4,5 +4,6 @@
 int main() {
     //glfw_basic();
     //shader_basic();
-    path_rendering_ext_basic();
+    //path_rendering_ext_basic();
+    geometry_shader();
 }
