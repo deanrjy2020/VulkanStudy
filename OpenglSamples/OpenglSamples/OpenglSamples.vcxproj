@@ -154,14 +154,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="tests\glfw_basic.cpp" />
-    <ClCompile Include="tests\geometry_shader.cpp" />
+    <ClCompile Include="tests\geometry_shader_basic.cpp" />
     <ClCompile Include="tests\path_rendering_ext_basic.cpp" />
     <ClCompile Include="tests\shader_basic.cpp" />
+    <ClCompile Include="tests\tess_shader_basic.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tests.h" />
+    <ClInclude Include="common.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
