@@ -1,4 +1,4 @@
-#include <GL/glew.h>
+﻿#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -49,6 +49,8 @@ int isExtensionSupported(const char *extension)
     return 0;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+// http://developer.download.nvidia.com/opengl/specs/GL_NV_path_rendering.txt
 static int width, height;
 
 // looks like there is no glGen function for the path obj
@@ -85,7 +87,9 @@ static void doGraphics() {
     // clear the stencil buffer to zero and the color buffer to black
     glClearStencil(0);
     glClearColor(0, 0, 0, 0);
-    glStencilMask(~0);
+    // 0 means all bits are 0; ~0 means all bits are 1 (writeing to sbuffer, all pass.), 
+    // do not to specify the bit number.
+    glStencilMask(~0); 
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     // Use an orthographic path-to-clip-space transform to map the [0..500]x[0..400]
@@ -95,25 +99,117 @@ static void doGraphics() {
     glMatrixLoadIdentityEXT(GL_MODELVIEW);
 
     // Stencil the path:
-    glStencilFillPathNV(pathObject, GL_COUNT_UP_NV, 0x1F);
-
+    // 这句话就是把内容写到Sbuffer里面. 参数什么意思?
+    glStencilFillPathNV(pathObject, GL_COUNT_UP_NV, 0x1F); //fill是吧整个obj填满
 
     glEnable(GL_STENCIL_TEST);
+    // (sbuffer & 0x1F) 和 (0 & 0x1F) 比较, 不相等通过, 因为sbuf里面的内容(heart和star)不是0, 背景是0
     glStencilFunc(GL_NOTEQUAL, 0, 0x1F);
+    // keep: action to take if the stencil test fails.
+    // keep: action to take if the stencil test passes, but the depth test fails.
+    // zero: action to take if both the stencil and the depth test pass.
+    // 最后一个zero就是说这次做完了就把sbuf清掉, 下次做其他的时候不用在clear了.
     glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
     glColor3f(1, 1, 0); // yellow
-    glCoverFillPathNV(pathObject, GL_BOUNDING_BOX_NV);
+    glCoverFillPathNV(pathObject, GL_BOUNDING_BOX_NV); //画黄色的两个obj, fill是填满
 
+    // 画两个obj外面的白色的线
+    glPathParameteriNV(pathObject, GL_PATH_JOIN_STYLE_NV, GL_ROUND_NV); 
+    glPathParameterfNV(pathObject, GL_PATH_STROKE_WIDTH_NV, 6.5); //线的宽度
 
-    glPathParameteriNV(pathObject, GL_PATH_JOIN_STYLE_NV, GL_ROUND_NV);
-    glPathParameterfNV(pathObject, GL_PATH_STROKE_WIDTH_NV, 6.5);
-
-    glStencilStrokePathNV(pathObject, 0x1, ~0);
+    glStencilStrokePathNV(pathObject, 0x1, ~0); //和上面的fill对比, stroke 是把outline写进sbuf.
 
     glColor3f(1, 1, 1); // white
-    glCoverStrokePathNV(pathObject, GL_CONVEX_HULL_NV);
+    glCoverStrokePathNV(pathObject, GL_CONVEX_HULL_NV);//还是和上面fill对比.
+
+    // 画OpenGL字
+    const char *word = "OpenGLXY";
+    const GLsizei wordLen = (GLsizei)strlen(word);
+    GLuint glyphBase = glGenPathsNV(wordLen);
+    const GLfloat emScale = 2048; // match TrueType convention
+    GLuint templatePathObject = ~0; // Non-existant path object
+    // 在字库里面找字
+    glPathGlyphsNV(glyphBase,
+        GL_SYSTEM_FONT_NAME_NV, "Helvetica", GL_BOLD_BIT_NV,
+        wordLen, GL_UNSIGNED_BYTE, word,
+        GL_SKIP_MISSING_GLYPH_NV, templatePathObject, emScale);
+    glPathGlyphsNV(glyphBase,
+        GL_SYSTEM_FONT_NAME_NV, "Arial", GL_BOLD_BIT_NV,
+        wordLen, GL_UNSIGNED_BYTE, word,
+        GL_SKIP_MISSING_GLYPH_NV, templatePathObject, emScale);
+    glPathGlyphsNV(glyphBase,
+        GL_STANDARD_FONT_NAME_NV, "Sans", GL_BOLD_BIT_NV,
+        wordLen, GL_UNSIGNED_BYTE, word,
+        GL_USE_MISSING_GLYPH_NV, templatePathObject, emScale);
+
+    // GLfloat xtranslate[5 + 1]; // wordLen+1
+    GLfloat *xtranslate = (GLfloat*) malloc((wordLen + 1) * sizeof(GLfloat));
+    if (!xtranslate) {
+        printf("ERROR: xtranslate.\n");
+        return;
+    }
+
+    xtranslate[0] = 0; // Initial glyph offset is zero
+    glGetPathSpacingNV(GL_ACCUM_ADJACENT_PAIRS_NV,
+        wordLen + 1, GL_UNSIGNED_BYTE,
+        //多了, 和字符数对应就行.
+        "\000\001\002\003\004\005\006\007\008\009\009", // repeat last
+                                        // letter twice
+        glyphBase,
+        1.0f, 1.0f,
+        GL_TRANSLATE_X_NV,
+        xtranslate + 1);
+
+// bug, VS下找不到这两个macro
+#define GL_FONT_Y_MIN_BOUNDS_NV                             0x00020000
+#define GL_FONT_Y_MAX_BOUNDS_NV                             0x00080000
+
+    GLfloat yMinMax[2];
+    glGetPathMetricRangeNV(GL_FONT_Y_MIN_BOUNDS_NV | GL_FONT_Y_MAX_BOUNDS_NV,
+        glyphBase, /*count*/1,
+        2 * sizeof(GLfloat),
+        yMinMax);
+
+    glMatrixLoadIdentityEXT(GL_PROJECTION);
+    glMatrixOrthoEXT(GL_PROJECTION,
+        0, xtranslate[wordLen], yMinMax[0], yMinMax[1],
+        -1, 1);
+    glMatrixLoadIdentityEXT(GL_MODELVIEW);
+
+    glStencilFillPathInstancedNV(wordLen, GL_UNSIGNED_BYTE,
+        "\000\001\002\003\004\005\006\007\008\009",
+        glyphBase,
+        GL_PATH_FILL_MODE_NV, 0xFF,
+        GL_TRANSLATE_X_NV, xtranslate);
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_ZERO);
+    glColor3f(0.5, 0.5, 0.5); // 50% gray
+    //// a linear gradient color, bug??
+    //const GLfloat rgbGen[3][3] = {
+    //    { 0, 0, 0 }, // red = constant zero
+    //    { 0, 1, 0 }, // green = varies with y from bottom (0) to top (1)
+    //    { 0, -1, 1 } // blue = varies with y from bottom (1) to top (0)
+    //};
+    //glPathColorGenNV(GL_PRIMARY_COLOR, GL_PATH_OBJECT_BOUNDING_BOX_NV,
+    //    GL_RGB, &rgbGen[0][0]);
+
+    glCoverFillPathInstancedNV(wordLen, GL_UNSIGNED_BYTE,
+        "\000\001\002\003\004\005\006\007\008\009",
+        glyphBase,
+        GL_BOUNDING_BOX_OF_BOUNDING_BOXES_NV,
+        GL_TRANSLATE_X_NV, xtranslate);
+
+
+
+    if (xtranslate) {
+        free(xtranslate);
+        xtranslate = NULL;
+    }
 }
 static void exitGraphics() {
+
     // clean up and restore the status back
     glDeletePathsNV(pathObject, 1);
 
