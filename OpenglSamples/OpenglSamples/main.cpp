@@ -4,8 +4,8 @@
 int main() {
     //glfw_basic();
     //shader_basic();
-    path_rendering_ext_basic();
-    //geometry_shader();
+    //path_rendering_ext_basic();
+    geometry_shader_basic();
     
     // not ready
     //tess_shader_basic();

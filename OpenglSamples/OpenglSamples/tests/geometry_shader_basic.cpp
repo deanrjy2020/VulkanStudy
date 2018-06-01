@@ -182,7 +182,7 @@ static void exitGraphics() {
 
 // return >=0, good.
 // return <0, bad.
-int geometry_shader_baisc() {
+int geometry_shader_basic() {
     // put the window related functions (glfw) and glew funxtions here
     // Init GLFW
     glfwInit();
